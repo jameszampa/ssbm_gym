@@ -3,6 +3,7 @@ import atexit
 import platform
 import random
 import time
+from sb3_ssbm_env import CustomEnv
 
 options = dict(
     render=False,
@@ -24,7 +25,7 @@ num_workers = 4
 # Required for vectorized envs
 if __name__ == "__main__":
     print("Creating envs")
-    env = EnvVec(SSBMEnv, num_workers, options=options)
+    env = EnvVec(CustomEnv, num_workers, options=options)
     print("Envs created")
     print("Resetting envs")
     obs = env.reset()

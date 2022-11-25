@@ -26,6 +26,7 @@ t = time.time()
 for i in range(1000):
     action = random.randint(0, env.action_space.n - 1)
     obs, reward, done, infos = env.step(action)
+    # print(obs['player0']['character'])
     try:
         print("FPS:", round(1/(time.time() - t)), "\tPlayer 1 action state: ", env.obs.players[0].action_state, "\tPlayer 2 actions_state:", env.obs.players[1].action_state)
     except:

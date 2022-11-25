@@ -1,8 +1,25 @@
 from .dolphin_api import DolphinAPI
 from copy import deepcopy
+from .embed import numActions, numCharacters, numStages
+from .gen_code import char_ids 
+import random
+
+
+COMPETITVE_STAGES = ['fod', 'stadium', 'yoshis_story', 'dream_land', 'battlefield', 'final_destination']
+CHARACTERS = [name for name in char_ids.keys()]
+
 
 class BaseEnv():
     def __init__(self, frame_limit = 100000, pid = 0, options = {}):
+        options = dict(
+            render=False,
+            player1='ai',
+            player2='cpu',
+            char1='ics',
+            char2=CHARACTERS[random.randint(0, len(CHARACTERS) - 1)],
+            cpu2=7,
+            stage=COMPETITVE_STAGES[random.randint(0, len(COMPETITVE_STAGES) - 1)],
+        )
         self.api = DolphinAPI(**options)
         self.frame_limit = frame_limit
         self.pid = pid  # player id
@@ -41,14 +58,17 @@ class BaseEnv():
     def step(self, action):
         if self.obs is not None:
             self.prev_obs = deepcopy(self.obs)
-        
-        obs = self.api.step([self.action_space.from_index(action)])
+
+        obs = self.api.step([self.custom_action.from_index(action)])
         self.obs = obs
         reward = self.compute_reward()
         done = self.is_terminal()
         infos = dict({'frame': self.obs.frame})
 
-        return self.embed_obs(self.obs), reward, done, infos
+        # Check for NAN
+        custom_obs = self.embed_obs(self.obs)
+
+        return custom_obs, reward, done, infos
 
     def close(self):
         self.api.close()
@@ -184,13 +204,13 @@ class SubprocVecEnv():
         self.num_envs = len(env_fns)
         self.waiting = False
         self.closed = False
-
+        self.metadata = {}
         if start_method is None:
             # Fork is not a thread safe method (see issue #217)
             # but is more user friendly (does not require to wrap the code in
             # a `if __name__ == "__main__":`)
-            forkserver_available = 'forkserver' in multiprocessing.get_all_start_methods()
-            start_method = 'forkserver' if forkserver_available else 'spawn'
+            forkserver_available = 'fork' in multiprocessing.get_all_start_methods()
+            start_method = 'fork' if forkserver_available else 'spawn'
         ctx = multiprocessing.get_context(start_method)
 
         self.remotes, self.work_remotes = zip(*[ctx.Pipe() for _ in range(self.num_envs)])
@@ -207,14 +227,18 @@ class SubprocVecEnv():
         self.observation_space, self.action_space = self.remotes[0].recv()
 
     def step(self, actions):
-        self.step_async(actions)
-        return self.step_wait()
+        obs, rew, done, info = self.step_async(actions)
+        return obs, rew, done, info
 
     def step_async(self, actions):
-        for remote, action in zip(self.remotes, actions):
-            remote.send(('step', action))
-        self.waiting = True
+        #for remote, action in zip(self.remotes, actions):
+        self.remotes[actions['index']].send(('step', actions['action']))
+        obs, rew, done, info = self.remotes[actions['index']].recv()
+        return obs, rew, done, info
+        #self.waiting = True
 
+    def set_waiting(self, waiting):
+        self.waiting = waiting
 
     def step_wait(self):
         results = [remote.recv() for remote in self.remotes]

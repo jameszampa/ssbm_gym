@@ -6,8 +6,11 @@ numStages = 32
 maxJumps = 8
 
 def oneHot(x, n):
-    y = n * [0.0]
-    y[x] = 1.0
+    try:
+        y = n * [0.0]
+        y[x] = 1.0
+    except:
+        y[-1] = 1.0
     return y
 
 
