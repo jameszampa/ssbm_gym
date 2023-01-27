@@ -14,7 +14,7 @@ class BaseEnv():
         options = dict(
             render=False,
             player1='ai',
-            player2='cpu',
+            player2='ai',
             char1='ics',
             char2=CHARACTERS[random.randint(0, len(CHARACTERS) - 1)],
             cpu2=7,
