@@ -11,28 +11,25 @@ from ssbm_gym.ssbm_env import SubprocVecEnv, make_env
 from stable_baselines3.common.env_util import make_vec_env
 
 
-# Set up logging and model checkpoint directories
-ts = time.time()
-models_dir = f"models/{int(ts)}/"
-logdir = f"logs/{int(ts)}/"
-
-if not os.path.exists(models_dir):
-	os.makedirs(models_dir)
-
-if not os.path.exists(logdir):
-	os.makedirs(logdir)
+models_dir = "models/1674786159/"
+logdir = "logs/1674786159/"
 
 
-env = make_vec_env(MeleeSelfPlay, n_envs=32 * 2, env_kwargs={ 'model_name' : 'PPO' })
+env = make_vec_env(MeleeSelfPlay, n_envs=2, env_kwargs={ 'model_name' : 'PPO' })
 atexit.register(env.close)
 
-# Load stable_baselines3 PPO model
 
-model = PPO("MultiInputPolicy", env, verbose=1, tensorboard_log=logdir)
-
+max_iter = 0
+for filename in os.listdir(models_dir):
+    iteration = int(filename[:-4])
+    if iteration > max_iter:
+        max_iter = iteration
+model_path = f"{models_dir}/{str(max_iter)}.zip"
+model = PPO.load(model_path, env=env)
+model = PPO("MultiInputPolicy", env, tensorboard_log=logdir)
 
 TIMESTEPS = 1000000
-iters = 0
+iters = int(max_iter / TIMESTEPS)
 while True:
     iters += 1
     model.learn(total_timesteps=TIMESTEPS, reset_num_timesteps=False, tb_log_name=f"PPO")
