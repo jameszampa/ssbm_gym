@@ -17,19 +17,24 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = secrets.token_urlsafe(16)
 
 
+STARTING_PORT = 10000
+MAX_PER_SERVER = 32
+
+
 class MeleeInstance():
-    def __init__(self, gid, model_name):
+    def __init__(self, gid, model_name, doesRender):
         self.gid = gid
         self.hasOpponent = False
         self.opponentId = None
         self.model_name = model_name
         self.pid = None
+        self.doesRender = doesRender
 
 
 class DolphinInstance():
-    def __init__(self):
+    def __init__(self, doesRender):
         self.options = dict(
-            render=False,
+            render=doesRender,
             player1='ai',
             player2='ai',
             char1='falcon',
@@ -46,7 +51,7 @@ instances = {}
 dolphins = {}
 _embed_obs = EmbedGame(flat=False)
 custom_action = DiagonalActionSpace()
-
+curr_server_load_idx = 0
 
 def embed_obs(obs):
     obs = _embed_obs(obs)
@@ -115,7 +120,7 @@ def reset_game():
                         del dolphins[request_json['gid'] + '_' + gid]
                 except:
                     pass
-                dolphins[gid + '_' + request_json['gid']] = DolphinInstance()
+                dolphins[gid + '_' + request_json['gid']] = DolphinInstance(instances[gid].doesRender or instances[request_json['gid']].doesRender)
                 instances[gid].opponentId = request_json['gid']
                 instances[request_json['gid']].opponentId = gid
                 instances[gid].pid = 0
@@ -125,15 +130,16 @@ def reset_game():
                 break
         if not foundGame and not instances[request_json['gid']].hasOpponent:
             instances[request_json['gid']].waitingForOpponent = True
+            instances[request_json['gid']].hasOpponent = False
             print(f"Waiting for game... {request_json['gid']}")
             obs = {
-                'player0_character': np.zeros(shape=(numCharacters,)),
-                'player0_action_state': np.zeros(shape=(numActions,)),
-                'player0_state': np.zeros(shape=(10,)),
-                'player1_character': np.zeros(shape=(numCharacters,)),
-                'player1_action_state': np.zeros(shape=(numActions,)),
-                'player1_state': np.zeros(shape=(10,)),
-                'stage': np.zeros(shape=(numStages,)),
+                'player0_character': list(np.zeros(shape=(numCharacters,))),
+                'player0_action_state': list(np.zeros(shape=(numActions,))),
+                'player0_state': list(np.zeros(shape=(10,))),
+                'player1_character': list(np.zeros(shape=(numCharacters,))),
+                'player1_action_state': list(np.zeros(shape=(numActions,))),
+                'player1_state': list(np.zeros(shape=(10,))),
+                'stage': list(np.zeros(shape=(numStages,))),
             }
             return json.dumps({'observation': obs}), 200
         else:
@@ -152,14 +158,22 @@ def reset_game():
 
 @app.route('/assign_id', methods=["POST"])
 def assign_id():
+    global curr_server_load_idx
     if request.method == 'POST':
         request_json = request.get_json(force=True)
         gid = secrets.token_urlsafe(16)
         used_gids = [instances[inst_key].gid for inst_key in instances.keys()]
         while gid in used_gids:
             gid = secrets.token_urlsafe(16)
-        instances[gid] = MeleeInstance(gid, request_json["model_name"])
-        return json.dumps({'gid': gid}), 200
+        instances[gid] = MeleeInstance(gid, request_json["model_name"], request_json["doesRender"])
+        
+        if len(instances) <= MAX_PER_SERVER * 2 * (curr_server_load_idx + 1):
+            port = int(request_json["startingPort"]) + curr_server_load_idx
+        else:
+            curr_server_load_idx += 1
+            port = int(request_json["startingPort"]) + curr_server_load_idx
+
+        return json.dumps({'gid': gid, 'port': port}), 200
     else:
         return Response(status=400)
 
@@ -191,7 +205,7 @@ def step():
         obs = dolphins[boardKey].dolphin.step([dolphins[boardKey].p1_action, dolphins[boardKey].p2_action])
         dolphins[boardKey].p1_action = None
         dolphins[boardKey].p2_action = None
-        done = is_terminal(obs, 100000)
+        done = is_terminal(obs, int(request_json['frame_limit']))
         # print(f"Taking dolphin step")
 
     if not dolphins[boardKey].prev_obs is None:

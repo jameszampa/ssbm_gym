@@ -11,7 +11,7 @@ from gym import spaces
 from stable_baselines3.common.callbacks import BaseCallback
 from ssbm_gym.embed import EmbedGame, numActions, numCharacters, numStages
 from ssbm_gym.spaces import DiagonalActionSpace
-
+from melee_server import STARTING_PORT
 
 
 
@@ -52,7 +52,7 @@ class MeleeSelfPlay(gym.Env):
     """Custom Environment that follows gym interface"""
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, model_name):
+    def __init__(self, model_name, render=False, startingPort=STARTING_PORT, frameLimit=10000):
         super(MeleeSelfPlay, self).__init__()
         spaces = {
             'player0_character': gym.spaces.Box(low=-1, high=1, shape=(numCharacters,)),
@@ -65,14 +65,24 @@ class MeleeSelfPlay(gym.Env):
         }
         self.observation_space = gym.spaces.Dict(spaces)
         self.metadata = {}
+        self.doesRender = render
+        self.frame_limit = frameLimit
 
         self.environment_ip = "127.0.0.1"
+        self.port = startingPort
         headers = {"Content-Type": "application/json"}
-        json_message = {'model_name':model_name}
-        response = requests.post(f"http://{self.environment_ip}:7000/assign_id", headers=headers, data=json.dumps(json_message))
+        json_message = {'model_name':model_name, 'doesRender':self.doesRender, 'startingPort': startingPort}
+        response = requests.post(f"http://{self.environment_ip}:{self.port}/assign_id", headers=headers, data=json.dumps(json_message))
         if 'error' in response.json().keys():
             raise ValueError(response.json()['error'])
         self.gid = response.json()['gid']
+        self.port = response.json()['port']
+        if self.port != startingPort:
+            response = requests.post(f"http://{self.environment_ip}:{self.port}/assign_id", headers=headers, data=json.dumps(json_message))
+            if 'error' in response.json().keys():
+                raise ValueError(response.json()['error'])
+            self.gid = response.json()['gid']
+        
         self.custom_action = DiagonalActionSpace()
         self.action_space = gym.spaces.Discrete(self.custom_action.n)
 
@@ -80,9 +90,10 @@ class MeleeSelfPlay(gym.Env):
     def step(self, action):
         headers = {"Content-Type": "application/json"}
         json_message = {'action': int(action),
-                        'gid': self.gid
+                        'gid': self.gid,
+                        'frame_limit': self.frame_limit
         }
-        response = requests.post(f"http://{self.environment_ip}:7000/step", headers=headers, data=json.dumps(json_message)).json()
+        response = requests.post(f"http://{self.environment_ip}:{self.port}/step", headers=headers, data=json.dumps(json_message)).json()
         if 'error' in response.keys():
             raise ValueError(response.json()['error'])
 
@@ -97,7 +108,7 @@ class MeleeSelfPlay(gym.Env):
         self.done = False
         headers = {"Content-Type": "application/json"}
         json_message = {'gid': self.gid}
-        response = requests.post(f"http://{self.environment_ip}:7000/reset", headers=headers, data=json.dumps(json_message)).json()
+        response = requests.post(f"http://{self.environment_ip}:{self.port}/reset", headers=headers, data=json.dumps(json_message)).json()
         if 'error' in response.keys():
             raise ValueError(response['error'])
         self.observation = response['observation']
