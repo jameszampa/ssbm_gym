@@ -14,24 +14,25 @@ import start_servers
 time.sleep(5)
 NUM_SERVERS = start_servers.TOTAL_NUM_PORTS
 
-
+char1 = 'peach'
+char2 = 'falcon'
 ts = time.time()
-# models_dir = f"models/{int(ts)}/"
-# logdir = f"logs/{int(ts)}/"
+models_dir = f"models/{char1}_{char2}_{int(ts)}/"
+logdir = f"logs/{char1}_{char2}_{int(ts)}/"
 
-# if not os.path.exists(models_dir):
-# 	os.makedirs(models_dir)
+if not os.path.exists(models_dir):
+	os.makedirs(models_dir)
 
-# if not os.path.exists(logdir):
-# 	os.makedirs(logdir)
+if not os.path.exists(logdir):
+	os.makedirs(logdir)
 
-models_dir = "models/1675110384/"
-logdir = "logs/1675110384/"
+# models_dir = "models/1675110384/"
+# logdir = "logs/1675110384/"
 
-env = make_vec_env(MeleeSelfPlay, n_envs=32 * 2 * NUM_SERVERS, env_kwargs={ 'model_name' : 'PPO' })
+env = make_vec_env(MeleeSelfPlay, n_envs=32 * 2 * NUM_SERVERS, env_kwargs={ 'model_name' : 'PPO', 'char1': char1, 'char2': char2, 'startingPort': start_servers.STARTING_PORT})
 atexit.register(env.close)
 
-# model = PPO("MultiInputPolicy", env, verbose=1, tensorboard_log=logdir)
+# 
 def get_latest_model(models_dir):
     max_iter = 0
     filename_iter = None
@@ -44,12 +45,14 @@ def get_latest_model(models_dir):
             filename_iter = filename
     return max_iter, filename_iter
 
-max_iter, filename = get_latest_model(models_dir)
-model_path = f"{models_dir}/{filename}"
-model = PPO.load(model_path, env=env, verbose=1, tensorboard_log=logdir)
+#max_iter, filename = get_latest_model(models_dir)
+#model_path = f"{models_dir}/{filename}"
+#model = PPO.load(model_path, env=env, verbose=1, tensorboard_log=logdir)
+model = PPO("MultiInputPolicy", env, verbose=1, tensorboard_log=logdir)
 
 TIMESTEPS = 10000000
-iters = max_iter / TIMESTEPS
+#iters = max_iter / TIMESTEPS
+iters = 0
 while True:
     iters += 1
     model.learn(total_timesteps=TIMESTEPS, reset_num_timesteps=False, tb_log_name=f"PPO")

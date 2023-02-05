@@ -20,7 +20,7 @@ TOTAL_NUM_PORTS = 1
 
 processes = []
 for i in range(TOTAL_NUM_PORTS):
-    p = subprocess.Popen(["./launch_server.sh", str(20000 + i)])
+    p = subprocess.Popen(["./launch_server.sh", str(20100 + i)])
     processes.append(p)
 
 time.sleep(5)
@@ -35,9 +35,10 @@ ts = time.time()
 # if not os.path.exists(logdir):
 # 	os.makedirs(logdir)
 
-models_dir = "models/1675110384/"
+models_dir = "models/marth_fox_1675534734/"
 
-
+char1 = 'marth'
+char2 = 'fox'
 
 # Load stable_baselines3 PPO model
 
@@ -55,7 +56,7 @@ def get_latest_model(models_dir):
 
 max_iter, filename = get_latest_model(models_dir)
 model_path = f"{models_dir}/{filename}"
-env = make_vec_env(MeleeSelfPlay, n_envs=2, env_kwargs={ 'model_name' : 'PPO' , 'render' : True, 'startingPort': 20000, 'frameLimit': 1000000})
+env = make_vec_env(MeleeSelfPlay, n_envs=2, env_kwargs={ 'model_name' : 'PPO' , 'render' : True, 'startingPort': 20000, 'frameLimit': 1000000, 'char1': char1, 'char2': char2})
 atexit.register(env.close)
 model = PPO.load(model_path, env=env, verbose=1)
 obs = env.reset()

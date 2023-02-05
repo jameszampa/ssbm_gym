@@ -17,28 +17,30 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = secrets.token_urlsafe(16)
 
 
-STARTING_PORT = 10000
+
 MAX_PER_SERVER = 32
 
 
 class MeleeInstance():
-    def __init__(self, gid, model_name, doesRender):
+    def __init__(self, gid, model_name, doesRender, char1, char2):
         self.gid = gid
         self.hasOpponent = False
         self.opponentId = None
         self.model_name = model_name
         self.pid = None
         self.doesRender = doesRender
+        self.char1 = char1
+        self.char2 = char2
 
 
 class DolphinInstance():
-    def __init__(self, doesRender):
+    def __init__(self, doesRender, char1, char2):
         self.options = dict(
             render=doesRender,
             player1='ai',
             player2='ai',
-            char1='falcon',
-            char2='falcon',
+            char1=char1,
+            char2=char2,
             stage=COMPETITVE_STAGES[random.randint(0, len(COMPETITVE_STAGES) - 1)],
         )
         self.dolphin = DolphinAPI(**self.options)
@@ -120,7 +122,9 @@ def reset_game():
                         del dolphins[request_json['gid'] + '_' + gid]
                 except:
                     pass
-                dolphins[gid + '_' + request_json['gid']] = DolphinInstance(instances[gid].doesRender or instances[request_json['gid']].doesRender)
+                dolphins[gid + '_' + request_json['gid']] = DolphinInstance(instances[gid].doesRender or instances[request_json['gid']].doesRender,
+                                                                            instances[gid].char1,
+                                                                            instances[gid].char2)
                 instances[gid].opponentId = request_json['gid']
                 instances[request_json['gid']].opponentId = gid
                 instances[gid].pid = 0
@@ -165,7 +169,7 @@ def assign_id():
         used_gids = [instances[inst_key].gid for inst_key in instances.keys()]
         while gid in used_gids:
             gid = secrets.token_urlsafe(16)
-        instances[gid] = MeleeInstance(gid, request_json["model_name"], request_json["doesRender"])
+        instances[gid] = MeleeInstance(gid, request_json["model_name"], request_json["doesRender"], request_json["char1"], request_json["char2"])
         
         if len(instances) <= MAX_PER_SERVER * 2 * (curr_server_load_idx + 1):
             port = int(request_json["startingPort"]) + curr_server_load_idx

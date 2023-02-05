@@ -11,8 +11,7 @@ from gym import spaces
 from stable_baselines3.common.callbacks import BaseCallback
 from ssbm_gym.embed import EmbedGame, numActions, numCharacters, numStages
 from ssbm_gym.spaces import DiagonalActionSpace
-from melee_server import STARTING_PORT
-
+from constants import STARTING_PORT
 
 
 
@@ -52,7 +51,7 @@ class MeleeSelfPlay(gym.Env):
     """Custom Environment that follows gym interface"""
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, model_name, render=False, startingPort=STARTING_PORT, frameLimit=10000):
+    def __init__(self, model_name, render=False, startingPort=STARTING_PORT, frameLimit=10000, char1='falcon', char2='falcon'):
         super(MeleeSelfPlay, self).__init__()
         spaces = {
             'player0_character': gym.spaces.Box(low=-1, high=1, shape=(numCharacters,)),
@@ -67,11 +66,13 @@ class MeleeSelfPlay(gym.Env):
         self.metadata = {}
         self.doesRender = render
         self.frame_limit = frameLimit
+        self.char1 = char1
+        self.char2 = char2
 
         self.environment_ip = "127.0.0.1"
         self.port = startingPort
         headers = {"Content-Type": "application/json"}
-        json_message = {'model_name':model_name, 'doesRender':self.doesRender, 'startingPort': startingPort}
+        json_message = {'model_name':model_name, 'doesRender':self.doesRender, 'startingPort': startingPort, 'char1': self.char1, 'char2': self.char2}
         response = requests.post(f"http://{self.environment_ip}:{self.port}/assign_id", headers=headers, data=json.dumps(json_message))
         if 'error' in response.json().keys():
             raise ValueError(response.json()['error'])
