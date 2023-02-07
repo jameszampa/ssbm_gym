@@ -10,26 +10,37 @@ from stable_baselines3 import PPO
 import numpy as np
 from ssbm_gym.ssbm_env import SubprocVecEnv, make_env
 from stable_baselines3.common.env_util import make_vec_env
-import start_servers
-time.sleep(5)
-NUM_SERVERS = start_servers.TOTAL_NUM_PORTS
+from constants import *
+import argparse
 
-char1 = 'peach'
-char2 = 'falcon'
+parser = argparse.ArgumentParser()
+
+parser.add_argument("char")
+parser.add_argument("resume", nargs='?', default=False)
+parser.add_argument("model_dir", nargs='?', default=None)
+
+args = parser.parse_args()
+
+time.sleep(15)
+
+NUM_SERVERS = TOTAL_NUM_PORTS
+
+char = args.char
 ts = time.time()
-models_dir = f"models/{char1}_{char2}_{int(ts)}/"
-logdir = f"logs/{char1}_{char2}_{int(ts)}/"
+if not args.resume:
+    models_dir = f"models/{char}_{int(ts)}/"
+    logdir = f"logs/{char}_{int(ts)}/"
 
-if not os.path.exists(models_dir):
-	os.makedirs(models_dir)
+    if not os.path.exists(models_dir):
+        os.makedirs(models_dir)
 
-if not os.path.exists(logdir):
-	os.makedirs(logdir)
+    if not os.path.exists(logdir):
+        os.makedirs(logdir)
+else:
+    models_dir = args.model_dir
+    logdir = os.path.join('logs', args.model_dir.split(os.sep)[-1])
 
-# models_dir = "models/1675110384/"
-# logdir = "logs/1675110384/"
-
-env = make_vec_env(MeleeSelfPlay, n_envs=32 * 2 * NUM_SERVERS, env_kwargs={ 'model_name' : 'PPO', 'char1': char1, 'char2': char2, 'startingPort': start_servers.STARTING_PORT})
+env = make_vec_env(MeleeSelfPlay, n_envs=24 * 2, env_kwargs={ 'model_name' : 'PPO', 'char': char, 'startingPort': STARTING_PORT, 'render': False})
 atexit.register(env.close)
 
 # 
@@ -45,14 +56,20 @@ def get_latest_model(models_dir):
             filename_iter = filename
     return max_iter, filename_iter
 
-#max_iter, filename = get_latest_model(models_dir)
-#model_path = f"{models_dir}/{filename}"
-#model = PPO.load(model_path, env=env, verbose=1, tensorboard_log=logdir)
-model = PPO("MultiInputPolicy", env, verbose=1, tensorboard_log=logdir)
-
 TIMESTEPS = 10000000
 #iters = max_iter / TIMESTEPS
-iters = 0
+
+
+if not args.resume:
+    model = PPO("MultiInputPolicy", env, verbose=1, tensorboard_log=logdir, device='cuda:1')
+    iters = 0
+else:
+    max_iter, filename = get_latest_model(models_dir)
+    model_path = f"{models_dir}/{filename}"
+    model = PPO.load(model_path, env=env, verbose=1, tensorboard_log=logdir, device='cuda:1')
+    iters = int(max_iter / TIMESTEPS)
+
+
 while True:
     iters += 1
     model.learn(total_timesteps=TIMESTEPS, reset_num_timesteps=False, tb_log_name=f"PPO")

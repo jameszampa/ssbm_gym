@@ -51,7 +51,7 @@ class MeleeSelfPlay(gym.Env):
     """Custom Environment that follows gym interface"""
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, model_name, render=False, startingPort=STARTING_PORT, frameLimit=10000, char1='falcon', char2='falcon'):
+    def __init__(self, model_name, render=False, startingPort=STARTING_PORT, frameLimit=10000, char='falcon'):
         super(MeleeSelfPlay, self).__init__()
         spaces = {
             'player0_character': gym.spaces.Box(low=-1, high=1, shape=(numCharacters,)),
@@ -66,23 +66,22 @@ class MeleeSelfPlay(gym.Env):
         self.metadata = {}
         self.doesRender = render
         self.frame_limit = frameLimit
-        self.char1 = char1
-        self.char2 = char2
+        self.char = char
 
         self.environment_ip = "127.0.0.1"
         self.port = startingPort
         headers = {"Content-Type": "application/json"}
-        json_message = {'model_name':model_name, 'doesRender':self.doesRender, 'startingPort': startingPort, 'char1': self.char1, 'char2': self.char2}
+        json_message = {'model_name':model_name, 'doesRender':self.doesRender, 'startingPort': startingPort, 'char': self.char}
         response = requests.post(f"http://{self.environment_ip}:{self.port}/assign_id", headers=headers, data=json.dumps(json_message))
         if 'error' in response.json().keys():
             raise ValueError(response.json()['error'])
         self.gid = response.json()['gid']
         self.port = response.json()['port']
+        json_message = {'model_name':model_name, 'doesRender':self.doesRender, 'startingPort': startingPort, 'char': self.char, 'gid': self.gid, 'port': self.port}
         if self.port != startingPort:
-            response = requests.post(f"http://{self.environment_ip}:{self.port}/assign_id", headers=headers, data=json.dumps(json_message))
+            requests.post(f"http://{self.environment_ip}:{self.port}/assign_id", headers=headers, data=json.dumps(json_message))
             if 'error' in response.json().keys():
                 raise ValueError(response.json()['error'])
-            self.gid = response.json()['gid']
         
         self.custom_action = DiagonalActionSpace()
         self.action_space = gym.spaces.Discrete(self.custom_action.n)

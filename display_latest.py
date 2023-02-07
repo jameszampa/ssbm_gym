@@ -15,13 +15,14 @@ from ssbm_gym.ssbm_env import SubprocVecEnv, make_env
 from MeleeSelfPlay import MeleeSelfPlay
 
 import subprocess
+import argparse
 
-TOTAL_NUM_PORTS = 1
+parser = argparse.ArgumentParser()
 
-processes = []
-for i in range(TOTAL_NUM_PORTS):
-    p = subprocess.Popen(["./launch_server.sh", str(20100 + i)])
-    processes.append(p)
+parser.add_argument("char")
+parser.add_argument("model_dir")
+
+args = parser.parse_args()
 
 time.sleep(5)
 
@@ -35,10 +36,8 @@ ts = time.time()
 # if not os.path.exists(logdir):
 # 	os.makedirs(logdir)
 
-models_dir = "models/marth_fox_1675534734/"
-
-char1 = 'marth'
-char2 = 'fox'
+models_dir = args.model_dir
+char = args.char
 
 # Load stable_baselines3 PPO model
 
@@ -54,9 +53,10 @@ def get_latest_model(models_dir):
             filename_iter = filename
     return max_iter, filename_iter
 
+
 max_iter, filename = get_latest_model(models_dir)
 model_path = f"{models_dir}/{filename}"
-env = make_vec_env(MeleeSelfPlay, n_envs=2, env_kwargs={ 'model_name' : 'PPO' , 'render' : True, 'startingPort': 20000, 'frameLimit': 1000000, 'char1': char1, 'char2': char2})
+env = make_vec_env(MeleeSelfPlay, n_envs=1, env_kwargs={ 'model_name' : 'PPO' , 'render' : True, 'startingPort': 20000, 'frameLimit': 1000000, 'char': char})
 atexit.register(env.close)
 model = PPO.load(model_path, env=env, verbose=1)
 obs = env.reset()

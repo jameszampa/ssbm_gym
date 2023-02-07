@@ -1,12 +1,10 @@
 import subprocess
-from subprocess import Popen
 from constants import STARTING_PORT
-
-
-TOTAL_NUM_PORTS = 4
+from constants import TOTAL_NUM_PORTS
 
 
 processes = []
+p = subprocess.Popen(["./launch_server_main.sh", str(STARTING_PORT)])
 for i in range(TOTAL_NUM_PORTS):
-    p = subprocess.Popen(["./launch_server.sh", str(STARTING_PORT + i)])
+    p = subprocess.Popen(["./launch_server.sh", str(STARTING_PORT + i + 1)])
     processes.append(p)

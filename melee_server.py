@@ -11,26 +11,14 @@ from ssbm_gym.dolphin_api import DolphinAPI
 from ssbm_gym.ssbm_env import CHARACTERS, COMPETITVE_STAGES
 from ssbm_gym.embed import EmbedGame, numActions, numCharacters, numStages
 from ssbm_gym.spaces import DiagonalActionSpace
+from MeleeInstance import MeleeInstance
 
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = secrets.token_urlsafe(16)
 
 
-
 MAX_PER_SERVER = 32
-
-
-class MeleeInstance():
-    def __init__(self, gid, model_name, doesRender, char1, char2):
-        self.gid = gid
-        self.hasOpponent = False
-        self.opponentId = None
-        self.model_name = model_name
-        self.pid = None
-        self.doesRender = doesRender
-        self.char1 = char1
-        self.char2 = char2
 
 
 class DolphinInstance():
@@ -47,13 +35,15 @@ class DolphinInstance():
         self.p1_action = None
         self.p2_action = None
         self.prev_obs = None
+        self.isReset = False
+        self.stepRunning = False
 
 
 instances = {}
 dolphins = {}
 _embed_obs = EmbedGame(flat=False)
 custom_action = DiagonalActionSpace()
-curr_server_load_idx = 0
+
 
 def embed_obs(obs):
     obs = _embed_obs(obs)
@@ -123,13 +113,14 @@ def reset_game():
                 except:
                     pass
                 dolphins[gid + '_' + request_json['gid']] = DolphinInstance(instances[gid].doesRender or instances[request_json['gid']].doesRender,
-                                                                            instances[gid].char1,
-                                                                            instances[gid].char2)
+                                                                            instances[gid].char,
+                                                                            instances[request_json['gid']].char)
+                #dolphins[instances[request_json['gid']].opponentId + '_' + request_json['gid']].prev_obs = None
                 instances[gid].opponentId = request_json['gid']
                 instances[request_json['gid']].opponentId = gid
                 instances[gid].pid = 0
                 instances[request_json['gid']].pid = 1
-                print(f"Found Game! {gid} vs. {instances[gid].opponentId}")
+                print(f"Found Game! {instances[gid].char} vs. {instances[request_json['gid']].char}")
                 foundGame = True
                 break
         if not foundGame and not instances[request_json['gid']].hasOpponent:
@@ -147,14 +138,48 @@ def reset_game():
             }
             return json.dumps({'observation': obs}), 200
         else:
-            print(f"Resetting dolphin...")
+            
             try:
-                obs = dolphins[instances[request_json['gid']].opponentId + '_' + request_json['gid']].dolphin.reset()
-                dolphins[instances[request_json['gid']].opponentId + '_' + request_json['gid']].prev_obs = obs
+                if not dolphins[instances[request_json['gid']].opponentId + '_' + request_json['gid']].isReset:
+                    print(f"Resetting dolphin...")
+                    dolphins[instances[request_json['gid']].opponentId + '_' + request_json['gid']].isReset = True
+                    obs = dolphins[instances[request_json['gid']].opponentId + '_' + request_json['gid']].dolphin.reset()
+                    dolphins[instances[request_json['gid']].opponentId + '_' + request_json['gid']].prev_obs = obs
+                    dolphins[instances[request_json['gid']].opponentId + '_' + request_json['gid']].isReset = False
+                    dolphins[instances[request_json['gid']].opponentId + '_' + request_json['gid']].waitingToReset = False
+                else:
+                    obs = {
+                        'player0_character': list(np.zeros(shape=(numCharacters,))),
+                        'player0_action_state': list(np.zeros(shape=(numActions,))),
+                        'player0_state': list(np.zeros(shape=(10,))),
+                        'player1_character': list(np.zeros(shape=(numCharacters,))),
+                        'player1_action_state': list(np.zeros(shape=(numActions,))),
+                        'player1_state': list(np.zeros(shape=(10,))),
+                        'stage': list(np.zeros(shape=(numStages,))),
+                    }
+                    return json.dumps({'observation': obs}), 200
             except:
-                obs = dolphins[request_json['gid'] + '_' + instances[request_json['gid']].opponentId].dolphin.reset()
-                dolphins[request_json['gid'] + '_' + instances[request_json['gid']].opponentId].prev_obs = obs
+                if not dolphins[request_json['gid'] + '_' + instances[request_json['gid']].opponentId].isReset:
+                    print(f"Resetting dolphin...")
+                    dolphins[request_json['gid'] + '_' + instances[request_json['gid']].opponentId].isReset = True
+                    obs = dolphins[request_json['gid'] + '_' + instances[request_json['gid']].opponentId].dolphin.reset()
+                    dolphins[request_json['gid'] + '_' + instances[request_json['gid']].opponentId].prev_obs = obs
+                    dolphins[request_json['gid'] + '_' + instances[request_json['gid']].opponentId].isReset = False
+                    dolphins[request_json['gid'] + '_' + instances[request_json['gid']].opponentId].waitingToReset = False
+                else:
+                    obs = {
+                        'player0_character': list(np.zeros(shape=(numCharacters,))),
+                        'player0_action_state': list(np.zeros(shape=(numActions,))),
+                        'player0_state': list(np.zeros(shape=(10,))),
+                        'player1_character': list(np.zeros(shape=(numCharacters,))),
+                        'player1_action_state': list(np.zeros(shape=(numActions,))),
+                        'player1_state': list(np.zeros(shape=(10,))),
+                        'stage': list(np.zeros(shape=(numStages,))),
+                    }
+                    return json.dumps({'observation': obs}), 200
             print(f"Done!")
+            instances[instances[request_json['gid']].opponentId].isDone = False
+            instances[request_json['gid']].isDone = False
             return json.dumps({'observation': embed_obs(obs)}), 200
     else:
         return Response(status=400)
@@ -162,22 +187,12 @@ def reset_game():
 
 @app.route('/assign_id', methods=["POST"])
 def assign_id():
-    global curr_server_load_idx
     if request.method == 'POST':
         request_json = request.get_json(force=True)
-        gid = secrets.token_urlsafe(16)
-        used_gids = [instances[inst_key].gid for inst_key in instances.keys()]
-        while gid in used_gids:
-            gid = secrets.token_urlsafe(16)
-        instances[gid] = MeleeInstance(gid, request_json["model_name"], request_json["doesRender"], request_json["char1"], request_json["char2"])
-        
-        if len(instances) <= MAX_PER_SERVER * 2 * (curr_server_load_idx + 1):
-            port = int(request_json["startingPort"]) + curr_server_load_idx
-        else:
-            curr_server_load_idx += 1
-            port = int(request_json["startingPort"]) + curr_server_load_idx
+        gid = request_json['gid']
+        instances[gid] = MeleeInstance(gid, request_json["model_name"], request_json["doesRender"], request_json["char"], request_json["port"])
 
-        return json.dumps({'gid': gid, 'port': port}), 200
+        return Response(status=200)
     else:
         return Response(status=400)
 
@@ -189,6 +204,22 @@ def step():
 
     request_json = request.get_json(force=True)
     opponentId = instances[request_json['gid']].opponentId
+    if opponentId is None:
+        obs = {
+            'player0_character': list(np.zeros(shape=(numCharacters,))),
+            'player0_action_state': list(np.zeros(shape=(numActions,))),
+            'player0_state': list(np.zeros(shape=(10,))),
+            'player1_character': list(np.zeros(shape=(numCharacters,))),
+            'player1_action_state': list(np.zeros(shape=(numActions,))),
+            'player1_state': list(np.zeros(shape=(10,))),
+            'stage': list(np.zeros(shape=(numStages,))),
+        }
+        json_message = {
+            'observation': obs,
+            'done': False,
+            'reward': 0
+        }
+        return json.dumps(json_message), 200
     try:
         _ = dolphins[request_json['gid'] + '_' + opponentId]
         boardKey = request_json['gid'] + '_' + opponentId
@@ -198,19 +229,29 @@ def step():
 
     if instances[request_json['gid']].pid == 0:
         dolphins[boardKey].p1_action = custom_action.from_index(int(request_json['action']))
-        # print(f"Updating action for P1 {int(request_json['action'])}")
+        #print(f"Updating action for P1 {int(request_json['action'])}")
     else:
         dolphins[boardKey].p2_action = custom_action.from_index(int(request_json['action']))
-        # print(f"Updating action for P2 {int(request_json['action'])}")
+        #print(f"Updating action for P2 {int(request_json['action'])}")
 
     obs = dolphins[boardKey].prev_obs
-    done = False
-    if not dolphins[boardKey].p1_action is None and not dolphins[boardKey].p2_action is None:
+    isDone = False
+    if not dolphins[boardKey].p1_action is None and not dolphins[boardKey].p2_action is None and not dolphins[boardKey].stepRunning and instances[request_json['gid']].pid == 0:
+        #print("gameStep!")
+        dolphins[boardKey].stepRunning = True
         obs = dolphins[boardKey].dolphin.step([dolphins[boardKey].p1_action, dolphins[boardKey].p2_action])
         dolphins[boardKey].p1_action = None
         dolphins[boardKey].p2_action = None
-        done = is_terminal(obs, int(request_json['frame_limit']))
+        isDone = is_terminal(obs, int(request_json['frame_limit']))
+        instances[request_json['gid']].isDone = isDone
+        instances[opponentId].isDone = isDone
+        #print("gameStep! Done")
+        dolphins[boardKey].stepRunning = False
         # print(f"Taking dolphin step")
+    done = False
+    if (instances[request_json['gid']].isDone or instances[opponentId].isDone) and not dolphins[boardKey].waitingToReset:
+        done = True
+        dolphins[boardKey].waitingToReset = True
 
     if not dolphins[boardKey].prev_obs is None:
         reward = compute_reward(dolphins[boardKey].prev_obs, obs, instances[request_json['gid']].pid)
@@ -218,8 +259,21 @@ def step():
         reward = 0
 
     dolphins[boardKey].prev_obs = deepcopy(obs)
+    
+    if obs is None:
+        obs = {
+            'player0_character': list(np.zeros(shape=(numCharacters,))),
+            'player0_action_state': list(np.zeros(shape=(numActions,))),
+            'player0_state': list(np.zeros(shape=(10,))),
+            'player1_character': list(np.zeros(shape=(numCharacters,))),
+            'player1_action_state': list(np.zeros(shape=(numActions,))),
+            'player1_state': list(np.zeros(shape=(10,))),
+            'stage': list(np.zeros(shape=(numStages,))),
+        }
+    else:
+        obs = embed_obs(obs)
     json_message = {
-        'observation': embed_obs(obs),
+        'observation': obs,
         'done': done,
         'reward': reward
     }
