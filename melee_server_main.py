@@ -48,7 +48,7 @@ def assign_id():
         port = int(request_json["startingPort"]) + min_port + 1
         port_count[min_port][request_json["char"]] += 1
 
-        instances[gid] = MeleeInstance(gid, request_json["model_name"], request_json["doesRender"], request_json["char"], port)
+        instances[gid] = MeleeInstance(gid, request_json["model_name"], request_json["doesRender"], request_json["char"], port, request_json["stage"])
 
         return json.dumps({'gid': gid, 'port': port}), 200
     else:

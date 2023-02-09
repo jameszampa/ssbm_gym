@@ -113,3 +113,5 @@ ISOs/*
 # James Addition
 logs/*
 models/*
+twitch_creds.json
+libmelee/*

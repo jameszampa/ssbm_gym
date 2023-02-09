@@ -1,4 +1,4 @@
-
+#!/usr/bin/env python
 
 import os
 import re
@@ -21,6 +21,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("char")
 parser.add_argument("model_dir")
+parser.add_argument("stage")
 
 args = parser.parse_args()
 
@@ -38,6 +39,7 @@ ts = time.time()
 
 models_dir = args.model_dir
 char = args.char
+stage = args.stage
 
 # Load stable_baselines3 PPO model
 
@@ -56,7 +58,7 @@ def get_latest_model(models_dir):
 
 max_iter, filename = get_latest_model(models_dir)
 model_path = f"{models_dir}/{filename}"
-env = make_vec_env(MeleeSelfPlay, n_envs=1, env_kwargs={ 'model_name' : 'PPO' , 'render' : True, 'startingPort': 20000, 'frameLimit': 1000000, 'char': char})
+env = make_vec_env(MeleeSelfPlay, n_envs=1, env_kwargs={ 'model_name' : 'PPO' , 'render' : True, 'startingPort': 20000, 'frameLimit': 1000000, 'char': char, 'stage': stage})
 atexit.register(env.close)
 model = PPO.load(model_path, env=env, verbose=1)
 obs = env.reset()

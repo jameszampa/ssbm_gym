@@ -51,7 +51,7 @@ class MeleeSelfPlay(gym.Env):
     """Custom Environment that follows gym interface"""
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, model_name, render=False, startingPort=STARTING_PORT, frameLimit=10000, char='falcon'):
+    def __init__(self, model_name, render=False, startingPort=STARTING_PORT, frameLimit=10000, char='falcon', stage='random'):
         super(MeleeSelfPlay, self).__init__()
         spaces = {
             'player0_character': gym.spaces.Box(low=-1, high=1, shape=(numCharacters,)),
@@ -67,17 +67,18 @@ class MeleeSelfPlay(gym.Env):
         self.doesRender = render
         self.frame_limit = frameLimit
         self.char = char
+        self.stage = stage
 
         self.environment_ip = "127.0.0.1"
         self.port = startingPort
         headers = {"Content-Type": "application/json"}
-        json_message = {'model_name':model_name, 'doesRender':self.doesRender, 'startingPort': startingPort, 'char': self.char}
+        json_message = {'model_name':model_name, 'doesRender':self.doesRender, 'startingPort': startingPort, 'char': self.char, 'stage': self.stage}
         response = requests.post(f"http://{self.environment_ip}:{self.port}/assign_id", headers=headers, data=json.dumps(json_message))
         if 'error' in response.json().keys():
             raise ValueError(response.json()['error'])
         self.gid = response.json()['gid']
         self.port = response.json()['port']
-        json_message = {'model_name':model_name, 'doesRender':self.doesRender, 'startingPort': startingPort, 'char': self.char, 'gid': self.gid, 'port': self.port}
+        json_message = {'model_name':model_name, 'doesRender':self.doesRender, 'startingPort': startingPort, 'char': self.char, 'gid': self.gid, 'port': self.port, 'stage': self.stage}
         if self.port != startingPort:
             requests.post(f"http://{self.environment_ip}:{self.port}/assign_id", headers=headers, data=json.dumps(json_message))
             if 'error' in response.json().keys():
@@ -109,6 +110,7 @@ class MeleeSelfPlay(gym.Env):
         headers = {"Content-Type": "application/json"}
         json_message = {'gid': self.gid}
         response = requests.post(f"http://{self.environment_ip}:{self.port}/reset", headers=headers, data=json.dumps(json_message)).json()
+        #print(response)
         if 'error' in response.keys():
             raise ValueError(response['error'])
         self.observation = response['observation']
@@ -120,4 +122,8 @@ class MeleeSelfPlay(gym.Env):
 
 
     def close (self):
-        pass
+        headers = {"Content-Type": "application/json"}
+        json_message = {'gid': self.gid}
+        response = requests.post(f"http://{self.environment_ip}:{self.port}/close", headers=headers, data=json.dumps(json_message)).json()
+        if 'error' in response.keys():
+            raise ValueError(response['error'])

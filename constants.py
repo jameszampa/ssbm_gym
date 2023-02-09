@@ -1,3 +1,3 @@
-STARTING_PORT = 10400
-TOTAL_NUM_PORTS = 6
-CHARACTERS = ['marth', 'fox', 'falco', 'falcon', 'sheik', 'puff']
+STARTING_PORT = 10000
+CHARACTERS = ['marth', 'fox', 'falco', 'falcon', 'sheik', 'samus', 'yoshi', 'pikachu', 'ics']
+TOTAL_NUM_PORTS = 1#len(CHARACTERS)

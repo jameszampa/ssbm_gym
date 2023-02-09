@@ -40,7 +40,7 @@ else:
     models_dir = args.model_dir
     logdir = os.path.join('logs', args.model_dir.split(os.sep)[-1])
 
-env = make_vec_env(MeleeSelfPlay, n_envs=24 * 2, env_kwargs={ 'model_name' : 'PPO', 'char': char, 'startingPort': STARTING_PORT, 'render': False})
+env = make_vec_env(MeleeSelfPlay, n_envs=32 * 2, env_kwargs={ 'model_name' : 'PPO', 'char': char, 'startingPort': STARTING_PORT, 'render': False})
 atexit.register(env.close)
 
 # 

@@ -1,5 +1,5 @@
 class MeleeInstance():
-    def __init__(self, gid, model_name, doesRender, char, port):
+    def __init__(self, gid, model_name, doesRender, char, port, stage):
         self.gid = gid
         self.hasOpponent = False
         self.opponentId = None
@@ -9,4 +9,5 @@ class MeleeInstance():
         self.char = char
         self.port = port
         self.isDone = False
-        self.waitingToReset = True
+        self.waitingToReset = True,
+        self.stage = stage
