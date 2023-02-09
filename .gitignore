@@ -115,3 +115,4 @@ logs/*
 models/*
 twitch_creds.json
 libmelee/*
+ssbm_gym/slippi-ssbm-asm/*
