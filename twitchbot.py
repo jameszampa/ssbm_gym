@@ -13,6 +13,7 @@ from twitchio.ext import commands
 from twitchio.ext import routines
 from ssbm_gym.gen_code import stage_ids
 import subprocess
+import psutil
 
 
 with open('twitch_creds.json', 'r') as f:
@@ -83,13 +84,54 @@ CHANNEL_ACCESS_TOKEN = j_obj['CHANNEL_ACCESS_TOKEN']
 #     controllerP1.press_button(button)
 #     gamestate = console.step()
 #     time.sleep(0.1)
-
+PORT = 20040
+NUM_INSTANCES = 1
 processes = []
-p = subprocess.Popen(["./launch_server_main.sh", str(20000)])
+p = subprocess.Popen(["./launch_server_main.sh", str(PORT)])
+process = psutil.Process(p.pid)
+process.nice(psutil.IOPRIO_CLASS_RT)
+processes.append(process)
 for i in range(1):
-    p = subprocess.Popen(["./launch_server.sh", str(20000 + i + 1)])
-    processes.append(p)
+    p = subprocess.Popen(["./launch_server.sh", str(PORT + i + 1)])
+    process = psutil.Process(p.pid)
+    process.nice(psutil.IOPRIO_CLASS_RT)
+    processes.append(process)
+time.sleep(10)
 setting_up = time.time()
+char_model_dir = {
+    'falco' : 'models/falco_1675869554',
+    'falcon' : 'models/falco_1675869554',
+    'fox' : 'models/falco_1675869554',
+    'ics' : 'models/falco_1675869554',
+    'marth' : 'models/falco_1675869554',
+    'pikachu' : 'models/falco_1675869554',
+    'samus' : 'models/falco_1675869554',
+    'sheik' : 'models/falco_1675869554',
+    'yoshi' : 'models/falco_1675869554',
+}
+
+
+def get_key_info():
+    environment_ip = "127.0.0.1"
+    port = PORT + 1
+    headers = {"Content-Type": "application/json"}
+    response = requests.get(f"http://{environment_ip}:{port}/instance_info", headers=headers).json()
+    return response['keys']
+
+
+class displayInstance:
+    def __init__(self, char1, char2, stage):
+        self.setupP1 = subprocess.Popen([f"./display_latest.py {char1} {char_model_dir[char1]} {stage}"], stdout=subprocess.PIPE, shell=True, preexec_fn=os.setsid)
+        time.sleep(1)
+        self.setupP2 = subprocess.Popen([f"./display_latest.py {char2} {char_model_dir[char2]} {stage}"], stdout=subprocess.PIPE, shell=True, preexec_fn=os.setsid)
+        self.ids = []
+        time.sleep(10)
+
+
+    def close(self):
+        os.killpg(os.getpgid(self.setupP1.pid), signal.SIGTERM)
+        os.killpg(os.getpgid(self.setupP2.pid), signal.SIGTERM)
+
 
 class Bot(commands.Bot):
     def __init__(self):
@@ -97,23 +139,23 @@ class Bot(commands.Bot):
         # prefix can be a callable, which returns a list of strings or a string...
         # initial_channels can also be a callable which returns a list of strings...
         super().__init__(token=BOT_ACCESS_TOKEN, prefix=BOT_PREFIX, initial_channels=[CHANNEL])
-        self.setupP1 = subprocess.Popen(["./display_latest.py fox models/fox_1675869554 final_destination"], stdout=subprocess.PIPE, shell=True, preexec_fn=os.setsid)
-        self.setupP2 = subprocess.Popen(["./display_latest.py fox models/fox_1675869554 final_destination"], stdout=subprocess.PIPE, shell=True, preexec_fn=os.setsid)
-        self.char_model_dir = {
-            'falco' : 'models/falco_1675869554',
-            'falcon' : 'models/falco_1675869554',
-            'fox' : 'models/falco_1675869554',
-            'ics' : 'models/falco_1675869554',
-            'marth' : 'models/falco_1675869554',
-            'pikachu' : 'models/falco_1675869554',
-            'samus' : 'models/falco_1675869554',
-            'sheik' : 'models/falco_1675869554',
-            'yoshi' : 'models/falco_1675869554',
-        }
-        self.stage_list = stage_ids.keys()
-        
+        self.instances = {}
 
-        
+        # get server ids for instances
+        for i in range(NUM_INSTANCES):
+            used_ids = []
+            for j in range(NUM_INSTANCES):
+                if j in self.instances.keys():
+                    used_ids += self.instances[j].ids
+
+            self.instances[i] = displayInstance("fox", "fox", "final_destination")
+            all_ids = get_key_info()
+            print(all_ids)
+            for id in all_ids:
+                if not id in used_ids:
+                    self.instances[i].ids.append(id)
+            print(self.instances[i].ids)
+
 
     async def event_ready(self):
         print(f'Logged in as | {self.nick}')
@@ -134,34 +176,49 @@ class Bot(commands.Bot):
         if time.time() - setting_up < 60:
             await self.connected_channels[0].send('Command executed too quickly, please wait')
             return
-        if len(argv) < 3:
-            await self.connected_channels[0].send('Too few arguments, try something like !set_matchup fox fox final_destination')
+        if len(argv) < 4:
+            await self.connected_channels[0].send('Too few arguments, try something like !set_matchup fox fox final_destination 0')
             return
-        if not argv[0] in self.char_model_dir.keys():
+        if not argv[0] in char_model_dir.keys():
             await self.connected_channels[0].send(f'Character: {argv[0]} is an unknown character or does not have a model. Check playable characters with !characters')
             return
-        if not argv[1] in self.char_model_dir.keys():
+        if not argv[1] in char_model_dir.keys():
             await self.connected_channels[0].send(f'Character: {argv[1]} is an unknown character or does not have a model. Check playable characters with !characters')
             return
         if not argv[2] in stage_ids.keys():
             await self.connected_channels[0].send(f'Stage: {argv[2]} is an unknown. Check playable stages with !stages')
             return
-        setting_up = time.time()
-        await self.connected_channels[0].send(f'Setting matchup to {argv[0]} vs. {argv[1]} on {argv[2]}')
-        environment_ip = "127.0.0.1"
-        port = 20001
-        headers = {"Content-Type": "application/json"}
-        response = requests.post(f"http://{environment_ip}:{port}/close_instance", headers=headers)
-        os.killpg(os.getpgid(self.setupP1.pid), signal.SIGTERM)
-        os.killpg(os.getpgid(self.setupP2.pid), signal.SIGTERM)
-        self.setupP1 = subprocess.Popen([f"./display_latest.py {argv[0]} {self.char_model_dir[argv[0]]} {argv[2]}"], stdout=subprocess.PIPE, shell=True, preexec_fn=os.setsid)
-        self.setupP2 = subprocess.Popen([f"./display_latest.py {argv[1]} {self.char_model_dir[argv[1]]} {argv[2]}"], stdout=subprocess.PIPE, shell=True, preexec_fn=os.setsid)
+        if not argv[3] in ['0']:
+            await self.connected_channels[0].send(f'Setup: {argv[3]} is an unknown. Try something like 0')
+            return
 
+        setting_up = time.time()
+        await self.connected_channels[0].send(f'Setting matchup to {argv[0]} vs. {argv[1]} on {argv[2]} at setup {argv[3]}')
+        environment_ip = "127.0.0.1"
+        port = PORT + 1
+        headers = {"Content-Type": "application/json"}
+        json_message = {'gids': self.instances[int(argv[3])].ids}
+        response = requests.post(f"http://{environment_ip}:{port}/close_instance", headers=headers, data=json.dumps(json_message))
+        self.instances[int(argv[3])].close()
+        del self.instances[int(argv[3])]
+
+        used_ids = []
+        for j in range(NUM_INSTANCES):
+            if j in self.instances.keys():
+                used_ids += self.instances[j].ids
+
+        self.instances[int(argv[3])] = displayInstance(argv[0], argv[1], argv[2])
+        all_ids = get_key_info()
+        print(all_ids)
+        for id in all_ids:
+            if not id in used_ids:
+                self.instances[i].ids.append(id)
+        print(self.instances[i].ids)
 
     @commands.command()
     async def characters(self, ctx: commands.Context, *argv):
         o_str = "List of playable characters: "
-        for char in self.char_model_dir.keys():
+        for char in char_model_dir.keys():
             o_str += char + " "
         await self.connected_channels[0].send(o_str)
 

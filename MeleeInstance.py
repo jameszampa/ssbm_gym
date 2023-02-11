@@ -11,3 +11,5 @@ class MeleeInstance():
         self.isDone = False
         self.waitingToReset = True,
         self.stage = stage
+        self.prev_obs1 = None
+        self.prev_obs2 = None

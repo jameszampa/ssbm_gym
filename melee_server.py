@@ -145,7 +145,6 @@ def reset_game():
             }
             return json.dumps({'observation': obs}), 200
         else:
-            
             try:
                 if not dolphins[instances[request_json['gid']].opponentId + '_' + request_json['gid']].isReset:
                     print(f"Resetting dolphin...")
@@ -283,6 +282,11 @@ def step():
 
     if not dolphins[boardKey].prev_obs2 is None and not dolphins[boardKey].prev_obs1 is None:
         reward = compute_reward(dolphins[boardKey].prev_obs2, dolphins[boardKey].prev_obs1, instances[request_json['gid']].pid)
+        if not instances[request_json['gid']].prev_obs1 is None and not instances[request_json['gid']].prev_obs2 is None:
+            if instances[request_json['gid']].prev_obs1 == dolphins[boardKey].prev_obs1 and instances[request_json['gid']].prev_obs2 == dolphins[boardKey].prev_obs2:
+                reward = 0
+        instances[request_json['gid']].prev_obs1 = dolphins[boardKey].prev_obs1
+        instances[request_json['gid']].prev_obs2 = dolphins[boardKey].prev_obs2
     else:
         reward = 0
 
@@ -312,16 +316,26 @@ def close():
 @app.route('/close_instance', methods=["POST"])
 def close_instance():
     try:
-        for gid in instances.keys():
-                opponentId = instances[gid].opponentId
-                try:
-                    dolphins[opponentId + '_' + gid].dolphin.close()
-                    del dolphins[opponentId + '_' + gid]
-                except:
-                    dolphins[gid + '_' + opponentId].dolphin.close()
-                    del dolphins[gid + '_' + opponentId]
-                del instances[gid]
-                del instances[opponentId]
-    except:
-        pass
+        request_json = request.get_json(force=True)
+        gid = request_json['gids'][0]
+        opponentId = instances[gid].opponentId
+        try:
+            dolphins[opponentId + '_' + gid].dolphin.close()
+            del dolphins[opponentId + '_' + gid]
+        except:
+            dolphins[gid + '_' + opponentId].dolphin.close()
+            del dolphins[gid + '_' + opponentId]
+        del instances[gid]
+        del instances[opponentId]
+    except Exception as e:
+        print(e)
+
     return Response(status=200)
+
+
+@app.route('/instance_info', methods=["GET"])
+def instance_info():
+    o_info = {'keys':[]}
+    for gid in instances.keys():
+        o_info['keys'].append(gid)
+    return json.dumps(o_info), 200

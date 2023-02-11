@@ -1,3 +1,4 @@
+import numpy as np
 maxAction = 0x017E
 numActions = 1 + maxAction
 
@@ -47,6 +48,10 @@ class EmbedPlayer():
         invulnerable = 1.0 if player_state.invulnerable else 0
         hitlag_frames_left = player_state.hitlag_frames_left/10.0
         hitstun_frames_left = player_state.hitstun_frames_left/10.0
+        if np.isnan(hitstun_frames_left):
+            hitstun_frames_left = 0
+        if np.isnan(hitlag_frames_left):
+            hitlag_frames_left = 0
         #jumps_used = float(player_state.jumps_used)
         #charging_smash = 1.0 if player_state.charging_smash else 0.0
         shield_size = player_state.shield_size/100.0

@@ -51,16 +51,16 @@ class MeleeSelfPlay(gym.Env):
     """Custom Environment that follows gym interface"""
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, model_name, render=False, startingPort=STARTING_PORT, frameLimit=10000, char='falcon', stage='random'):
+    def __init__(self, model_name, render=False, startingPort=STARTING_PORT, frameLimit=10000, char='falcon', stage='random', logdir=None):
         super(MeleeSelfPlay, self).__init__()
         spaces = {
-            'player0_character': gym.spaces.Box(low=-1, high=1, shape=(numCharacters,)),
-            'player0_action_state': gym.spaces.Box(low=-1, high=1, shape=(numActions,)),
-            'player0_state': gym.spaces.Box(low=-1, high=1, shape=(10,)),
-            'player1_character': gym.spaces.Box(low=-1, high=1, shape=(numCharacters,)),
-            'player1_action_state': gym.spaces.Box(low=-1, high=1, shape=(numActions,)),
-            'player1_state': gym.spaces.Box(low=-1, high=1, shape=(10,)),
-            'stage': gym.spaces.Box(low=-1, high=1, shape=(numStages,)),
+            'player0_character': gym.spaces.Box(low=-1, high=1, shape=(numCharacters,), dtype=np.float64),
+            'player0_action_state': gym.spaces.Box(low=-1, high=1, shape=(numActions,), dtype=np.float64),
+            'player0_state': gym.spaces.Box(low=-np.inf, high=np.inf, shape=(10,), dtype=np.float64),
+            'player1_character': gym.spaces.Box(low=-1, high=1, shape=(numCharacters,), dtype=np.float64),
+            'player1_action_state': gym.spaces.Box(low=-1, high=1, shape=(numActions,), dtype=np.float64),
+            'player1_state': gym.spaces.Box(low=-np.inf, high=np.inf, shape=(10,), dtype=np.float64),
+            'stage': gym.spaces.Box(low=-1, high=1, shape=(numStages,), dtype=np.float64),
         }
         self.observation_space = gym.spaces.Dict(spaces)
         self.metadata = {}
@@ -68,6 +68,7 @@ class MeleeSelfPlay(gym.Env):
         self.frame_limit = frameLimit
         self.char = char
         self.stage = stage
+        self.logdir = logdir
 
         self.environment_ip = "127.0.0.1"
         self.port = startingPort
@@ -102,6 +103,18 @@ class MeleeSelfPlay(gym.Env):
         self.done = response['done']
         self.reward = response['reward']
         info = {}
+        if not self.logdir is None:
+            with open(os.path.join(self.logdir, f'my_log_{self.gid}.log'), 'a') as f:
+                # for key, value in self.observation:
+                #     for val in value:
+                #         if np.isnan(val):
+                #             print('FOUNDNAN')
+                #             f.write("NAN" + "\n")
+                #             break
+                if np.isnan(self.reward):
+                    print('FOUNDNAN')
+                    f.write("NAN" + "\n")
+                f.write(str(self.observation) + "\n")
         return self.observation, self.reward, self.done, info
 
 
@@ -112,7 +125,8 @@ class MeleeSelfPlay(gym.Env):
         response = requests.post(f"http://{self.environment_ip}:{self.port}/reset", headers=headers, data=json.dumps(json_message)).json()
         #print(response)
         if 'error' in response.keys():
-            raise ValueError(response['error'])
+            return None
+            #raise ValueError(response['error'])
         self.observation = response['observation']
         return self.observation
 

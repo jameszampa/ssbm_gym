@@ -16,7 +16,7 @@ from MeleeSelfPlay import MeleeSelfPlay
 
 import subprocess
 import argparse
-
+os.nice(100)
 parser = argparse.ArgumentParser()
 
 parser.add_argument("char")
@@ -58,7 +58,7 @@ def get_latest_model(models_dir):
 
 max_iter, filename = get_latest_model(models_dir)
 model_path = f"{models_dir}/{filename}"
-env = make_vec_env(MeleeSelfPlay, n_envs=1, env_kwargs={ 'model_name' : 'PPO' , 'render' : True, 'startingPort': 20000, 'frameLimit': 1000000, 'char': char, 'stage': stage})
+env = make_vec_env(MeleeSelfPlay, n_envs=1, env_kwargs={ 'model_name' : 'PPO' , 'render' : True, 'startingPort': 20040, 'frameLimit': 1000000, 'char': char, 'stage': stage})
 atexit.register(env.close)
 model = PPO.load(model_path, env=env, verbose=1)
 obs = env.reset()
